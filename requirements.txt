@@ -2,3 +2,4 @@ streamlit
 numpy
 pandas
 streamlit-autorefresh
+streamlit_drawable_canvas
