@@ -1,60 +1,43 @@
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
-import datetime
 
-# Configuration de la page
-st.set_page_config(page_title="PDF Sync Demo", layout="wide")
+st.title("Démo : Lecture & signature de PDF")
 
-# Simulation d'une base de données partagée en mémoire
-if 'shared_db' not in st.session_state:
-    st.session_state['shared_db'] = {
-        "page_actuelle": 1,
-        "signature_statut": "En attente",
-        "last_update": datetime.datetime.now()
-    }
+# Affichage PDF
+pdf_file = st.file_uploader("Choisir un PDF", type=["pdf"])
+if pdf_file is not None:
+    # nécessite pip install PyMuPDF
+    import fitz  # PyMuPDF
+    import io
+    from PIL import Image
 
-# Rafraîchissement automatique toutes les secondes pour simuler le "temps réel"
-st_autorefresh(interval=1000, key="datarefresh")
+    pdf_reader = fitz.open(stream=pdf_file.read(), filetype="pdf")
+    for page_number in range(pdf_reader.page_count):
+        page = pdf_reader.load_page(page_number)
+        pix = page.get_pixmap()
+        img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+        st.image(img, caption=f"Page {page_number+1}")
 
-st.title("🚀 PDF Sync: PC ↔ Mobile")
+st.markdown("---")
+st.header("Zone de signature")
 
-col1, col2 = st.columns([2, 1])
+# Zone de dessin signature (nécessite st_canvas)
+from streamlit_drawable_canvas import st_canvas
 
-with col1:
-    st.header("Lecteur PDF (Simulation)")
-    # Simulation d'un PDF
-    page = st.session_state['shared_db']["page_actuelle"]
-    st.info(f"📄 Affichage du document : Page {page} / 10")
+canvas_result = st_canvas(
+    fill_color="rgba(255, 255, 255, 0)",  # Transparent background
+    stroke_width=2,
+    stroke_color="#000000",
+    background_color="#FFF3",
+    height=150,
+    width=450,
+    drawing_mode="freedraw",
+    key="canvas",
+)
 
-    # Zone de visualisation "synchrone"
-    st.markdown(f"""
-    <div style="height:300px; border:2px dashed #ccc; display:flex; align-items:center; justify-content:center; background-color:#f9f9f9">
-        <h2 style="color:#333;">{"✍️ Signature apposée !" if st.session_state['shared_db']["signature_statut"] == "Signé" else "Zone de Signature"}</h2>
-    </div>
-    """, unsafe_allow_html=True)
+if canvas_result.image_data is not None:
+    st.image(canvas_result.image_data, caption="Votre signature")
 
-with col2:
-    st.header("Contrôles")
+if canvas_result.image_data is not None and pdf_file is not None:
+    st.success("🔒 Signature dessinée ! (ici pas d'insertion dans PDF pour la démo)")
 
-    # Action 1 : Changer de page (Simule une action sur PC ou Mobile)
-    new_page = st.number_input("Aller à la page", min_value=1, max_value=10, value=page)
-    if new_page != page:
-        st.session_state['shared_db']["page_actuelle"] = new_page
-        st.session_state['shared_db']["last_update"] = datetime.datetime.now()
-
-    st.divider()
-
-    # Action 2 : Signer (Simule l'outil mobile)
-    st.subheader("Outil de Signature")
-    if st.button("🖊️ Signer le document", use_container_width=True):
-        st.session_state['shared_db']["signature_statut"] = "Signé"
-        st.session_state['shared_db']["last_update"] = datetime.datetime.now()
-        st.success("Synchronisation effectuée !")
-
-    if st.button("🗑️ Réinitialiser", use_container_width=True):
-        st.session_state['shared_db']["signature_statut"] = "En attente"
-        st.session_state['shared_db']["page_actuelle"] = 1
-
-st.sidebar.write("### Statut de Synchro")
-st.sidebar.write(f"Dernière modif : {st.session_state['shared_db']['last_update'].strftime('%H:%M:%S')}")
-st.sidebar.write(f"Mode : **Bidirectionnel (Wi-Fi)**")
+st.info("Pour une insertion de la signature dans le PDF et synchronisation temps réel, il faut développer une solution plus avancée, avec backend + WebSocket + traitement PDF en temps réel.")
